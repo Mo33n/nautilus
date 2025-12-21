@@ -113,6 +113,7 @@ cdef class DataEngine(Component):
     cdef readonly dict[UUID4, UUID4] _parent_long_request_id
     cdef readonly dict[UUID4, UUID4] _parent_join_request_id
     cdef readonly dict[UUID4, UUID4] _parent_request_id
+    cdef readonly bint _disable_historical_cache
 
     cdef TopicCache _topic_cache
 

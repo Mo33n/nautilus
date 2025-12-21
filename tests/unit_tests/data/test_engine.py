@@ -5112,6 +5112,134 @@ class TestDataEngine:
         spread = quote_tick.ask_price - quote_tick.bid_price
         assert spread == Price.from_str("0.25")
 
+    def test_disable_historical_cache_flag_prevents_cache_updates(self):
+        # Arrange
+        self.data_engine.register_client(self.binance_client)
+        self.binance_client.start()
+        self.data_engine.process(ETHUSDT_BINANCE)
+
+        # Create initial quote tick to establish baseline in cache
+        initial_tick = TestDataStubs.quote_tick(
+            instrument=ETHUSDT_BINANCE,
+            bid_price=100.0,
+            ask_price=101.0,
+            ts_event=1_000_000_000,
+            ts_init=1_000_000_000,
+        )
+        self.data_engine.process_historical(initial_tick)
+
+        # Verify initial tick is in cache
+        cached_tick_before = self.cache.quote_tick(ETHUSDT_BINANCE.id)
+        assert cached_tick_before is not None
+        assert cached_tick_before.bid_price == Price.from_str("100.0")
+
+        # Create a request
+        request = RequestQuoteTicks(
+            instrument_id=ETHUSDT_BINANCE.id,
+            start=None,
+            end=None,
+            limit=1000,
+            client_id=ClientId(BINANCE.value),
+            venue=BINANCE,
+            callback=None,
+            request_id=UUID4(),
+            ts_init=self.clock.timestamp_ns(),
+            params=None,
+        )
+
+        # Send request to register it
+        self.data_engine.request(request)
+
+        # Create new quote ticks that should update the cache when flag is False
+        new_tick = TestDataStubs.quote_tick(
+            instrument=ETHUSDT_BINANCE,
+            bid_price=102.0,
+            ask_price=103.0,
+            ts_event=2_000_000_000,
+            ts_init=2_000_000_000,
+        )
+
+        # Test 1: With _disable_historical_cache=False, cache should be updated
+        response_with_cache = DataResponse(
+            client_id=request.client_id,
+            venue=request.venue,
+            data_type=DataType(QuoteTick),
+            data=[new_tick],
+            correlation_id=request.id,
+            response_id=UUID4(),
+            start=None,
+            end=None,
+            ts_init=self.clock.timestamp_ns(),
+            params={"_disable_historical_cache": False},
+        )
+        self.data_engine.response(response_with_cache)
+
+        # Verify cache was updated
+        cached_tick_after_false = self.cache.quote_tick(ETHUSDT_BINANCE.id)
+        assert cached_tick_after_false is not None
+        assert cached_tick_after_false.bid_price == Price.from_str("102.0")
+        assert cached_tick_after_false.ask_price == Price.from_str("103.0")
+
+        # Reset cache state for next test
+        # Process a new tick directly to establish new baseline
+        baseline_tick = TestDataStubs.quote_tick(
+            instrument=ETHUSDT_BINANCE,
+            bid_price=200.0,
+            ask_price=201.0,
+            ts_event=3_000_000_000,
+            ts_init=3_000_000_000,
+        )
+        self.data_engine.process_historical(baseline_tick)
+        cached_tick_baseline = self.cache.quote_tick(ETHUSDT_BINANCE.id)
+        assert cached_tick_baseline.bid_price == Price.from_str("200.0")
+
+        # Create another request
+        request2 = RequestQuoteTicks(
+            instrument_id=ETHUSDT_BINANCE.id,
+            start=None,
+            end=None,
+            limit=1000,
+            client_id=ClientId(BINANCE.value),
+            venue=BINANCE,
+            callback=None,
+            request_id=UUID4(),
+            ts_init=self.clock.timestamp_ns(),
+            params=None,
+        )
+
+        # Send request to register it
+        self.data_engine.request(request2)
+
+        # Create new quote tick that should NOT update the cache when flag is True
+        new_tick2 = TestDataStubs.quote_tick(
+            instrument=ETHUSDT_BINANCE,
+            bid_price=205.0,
+            ask_price=206.0,
+            ts_event=4_000_000_000,
+            ts_init=4_000_000_000,
+        )
+
+        # Test 2: With _disable_historical_cache=True, cache should NOT be updated
+        response_without_cache = DataResponse(
+            client_id=request2.client_id,
+            venue=request2.venue,
+            data_type=DataType(QuoteTick),
+            data=[new_tick2],
+            correlation_id=request2.id,
+            response_id=UUID4(),
+            start=None,
+            end=None,
+            ts_init=self.clock.timestamp_ns(),
+            params={"_disable_historical_cache": True},
+        )
+        self.data_engine.response(response_without_cache)
+
+        # Verify cache was NOT updated (should still have the baseline tick)
+        cached_tick_after_true = self.cache.quote_tick(ETHUSDT_BINANCE.id)
+        assert cached_tick_after_true is not None
+        assert cached_tick_after_true.bid_price == Price.from_str("200.0")
+        assert cached_tick_after_true.ask_price == Price.from_str("201.0")
+
 
 class TestDataEngineQuoteFromDepth:
     @pytest.fixture(autouse=True)

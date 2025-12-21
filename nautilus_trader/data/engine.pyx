@@ -205,6 +205,7 @@ cdef class DataEngine(Component):
         self._parent_long_request_id: dict[UUID4, UUID4] = {}
         self._parent_join_request_id: dict[UUID4, UUID4] = {}
         self._parent_request_id: dict[UUID4, UUID4] = {}
+        self._disable_historical_cache: bool = False
 
         self._topic_cache = TopicCache()
 
@@ -2003,7 +2004,8 @@ cdef class DataEngine(Component):
         bint historical = False,
         dict params = None,
     ):
-        self._cache.add_instrument(instrument)
+        if not (historical and self._disable_historical_cache):
+            self._cache.add_instrument(instrument)
 
         if params is None:
             params = {}
@@ -2131,7 +2133,8 @@ cdef class DataEngine(Component):
                     self._handle_quote_tick(quote_tick)
 
     cpdef void _handle_quote_tick(self, QuoteTick tick, bint historical = False):
-        self._cache.add_quote_tick(tick)
+        if not (historical and self._disable_historical_cache):
+            self._cache.add_quote_tick(tick)
 
         # Handle synthetics update
         cdef:
@@ -2149,7 +2152,8 @@ cdef class DataEngine(Component):
         )
 
     cpdef void _handle_trade_tick(self, TradeTick tick, bint historical = False):
-        self._cache.add_trade_tick(tick)
+        if not (historical and self._disable_historical_cache):
+            self._cache.add_trade_tick(tick)
 
         # Handle synthetics update
         cdef:
@@ -2164,7 +2168,8 @@ cdef class DataEngine(Component):
         )
 
     cpdef void _handle_mark_price(self, MarkPriceUpdate mark_price, bint historical = False):
-        self._cache.add_mark_price(mark_price)
+        if not (historical and self._disable_historical_cache):
+            self._cache.add_mark_price(mark_price)
 
         self._msgbus.publish_c(
             topic=self._topic_cache.get_mark_prices_topic(mark_price.instrument_id, historical),
@@ -2172,7 +2177,8 @@ cdef class DataEngine(Component):
         )
 
     cpdef void _handle_index_price(self, IndexPriceUpdate index_price, bint historical = False):
-        self._cache.add_index_price(index_price)
+        if not (historical and self._disable_historical_cache):
+            self._cache.add_index_price(index_price)
 
         self._msgbus.publish_c(
             topic=self._topic_cache.get_index_prices_topic(index_price.instrument_id, historical),
@@ -2180,7 +2186,8 @@ cdef class DataEngine(Component):
         )
 
     cpdef void _handle_funding_rate(self, FundingRateUpdate funding_rate, bint historical = False):
-        self._cache.add_funding_rate(funding_rate)
+        if not (historical and self._disable_historical_cache):
+            self._cache.add_funding_rate(funding_rate)
 
         self._msgbus.publish_c(
             topic=self._topic_cache.get_funding_rates_topic(funding_rate.instrument_id, historical),
@@ -2222,7 +2229,7 @@ cdef class DataEngine(Component):
                         )
                         return  # Revision SHOULD be at `last_bar.ts_event`
 
-        if not bar.is_revision:
+        if not bar.is_revision and not (historical and self._disable_historical_cache):
             self._cache.add_bar(bar)
 
         self._msgbus.publish_c(topic=self._topic_cache.get_bars_topic(bar_type, historical), msg=bar)
@@ -2261,6 +2268,9 @@ cdef class DataEngine(Component):
             self._handle_response(grouped_response)
             return
 
+        if grouped_response.params.get("_disable_historical_cache", False):
+            self._disable_historical_cache = True
+
         cdef:
             bint query_past_data = response.params.get("subscription_name") is None
             Data data
@@ -2281,6 +2291,7 @@ cdef class DataEngine(Component):
                 grouped_response.params["data_count"] = len(grouped_response.data)
                 grouped_response.data = []
 
+        self._disable_historical_cache = False
         self._requests.pop(grouped_response.correlation_id, None)
 
         self._msgbus.response(grouped_response)

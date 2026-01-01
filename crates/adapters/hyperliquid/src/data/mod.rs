@@ -102,7 +102,7 @@ impl HyperliquidDataClient {
                 is_testnet: config.is_testnet,
                 vault_address: None,
             };
-            HyperliquidHttpClient::with_credentials(
+            HyperliquidHttpClient::with_secrets(
                 &secrets,
                 config.http_timeout_secs,
                 config.http_proxy_url.clone(),

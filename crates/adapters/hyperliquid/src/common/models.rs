@@ -1218,7 +1218,8 @@ mod tests {
 
         assert!(result.is_ok());
         let (price, qty) = result.unwrap();
-        assert_eq!(price, dec!(50123.45)); // rounded down to tick size
+        // Price is first rounded to 5 sig figs (50123), then to tick size
+        assert_eq!(price, dec!(50123.00));
         assert_eq!(qty, dec!(0.12345)); // rounded down to step size
 
         // Test with symbol not configured (should use defaults)

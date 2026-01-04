@@ -43,9 +43,10 @@ use super::{
     error::DeribitWsError,
     messages::{
         DeribitAuthResult, DeribitBookMsg, DeribitChartMsg, DeribitHeartbeatParams,
-        DeribitInstrumentStateMsg, DeribitJsonRpcRequest, DeribitPerpetualMsg, DeribitQuoteMsg,
-        DeribitSubscribeParams, DeribitTickerMsg, DeribitTradeMsg, DeribitWsMessage,
-        NautilusWsMessage, parse_raw_message,
+        DeribitInstrumentStateMsg, DeribitJsonRpcRequest, DeribitOrderMsg, DeribitPerpetualMsg,
+        DeribitPortfolioMsg, DeribitQuoteMsg, DeribitSubscribeParams, DeribitTickerMsg,
+        DeribitTradeMsg, DeribitUserTradeMsg, DeribitWsMessage, NautilusWsMessage,
+        parse_raw_message,
     },
     parse::{
         parse_book_msg, parse_chart_msg, parse_perpetual_to_funding_rate, parse_quote_msg,
@@ -628,6 +629,71 @@ impl DeribitWsFeedHandler {
                                 }
                             }
                         }
+                        DeribitWsChannel::UserOrders => {
+                            // Parse user order updates from user.orders.{instrument}.raw channel
+                            match serde_json::from_value::<Vec<DeribitOrderMsg>>(data.clone()) {
+                                Ok(orders) => {
+                                    tracing::debug!("Received {} user order updates", orders.len());
+                                    for order in orders {
+                                        // TODO: Parse order to appropriate event based on order_state
+                                        // For now, log and return raw
+                                        tracing::debug!(
+                                            "Order update: {} {} {} state={}",
+                                            order.order_id,
+                                            order.direction,
+                                            order.instrument_name,
+                                            order.order_state
+                                        );
+                                    }
+                                    return Some(NautilusWsMessage::Raw(data.clone()));
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Failed to deserialize user orders: {e}");
+                                }
+                            }
+                        }
+                        DeribitWsChannel::UserTrades => {
+                            // Parse user trade updates from user.trades.{instrument}.raw channel
+                            match serde_json::from_value::<Vec<DeribitUserTradeMsg>>(data.clone()) {
+                                Ok(trades) => {
+                                    tracing::debug!("Received {} user trade updates", trades.len());
+                                    for trade in trades {
+                                        // TODO: Parse trade to FillReport
+                                        tracing::debug!(
+                                            "Trade: {} {} {} @ {} qty={}",
+                                            trade.trade_id,
+                                            trade.direction,
+                                            trade.instrument_name,
+                                            trade.price,
+                                            trade.amount
+                                        );
+                                    }
+                                    return Some(NautilusWsMessage::Raw(data.clone()));
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Failed to deserialize user trades: {e}");
+                                }
+                            }
+                        }
+                        DeribitWsChannel::UserPortfolio => {
+                            // Parse portfolio/margin updates from user.portfolio.{currency} channel
+                            match serde_json::from_value::<DeribitPortfolioMsg>(data.clone()) {
+                                Ok(portfolio) => {
+                                    tracing::debug!(
+                                        "Portfolio update: {} equity={} balance={} margin={}",
+                                        portfolio.currency,
+                                        portfolio.equity,
+                                        portfolio.balance,
+                                        portfolio.margin_balance
+                                    );
+                                    // TODO: Convert to AccountState
+                                    return Some(NautilusWsMessage::Raw(data.clone()));
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Failed to deserialize portfolio: {e}");
+                                }
+                            }
+                        }
                         _ => {
                             // Unhandled channel - return raw
                             tracing::trace!("Unhandled channel: {channel}");
@@ -699,6 +765,13 @@ impl DeribitWsFeedHandler {
                                         if let Err(e) = self.out_tx.send(msg_to_send) {
                                             tracing::error!("Failed to send funding rates: {e}");
                                         }
+                                    }
+                                    // Execution events - send to output channel
+                                    NautilusWsMessage::OrderAccepted(_)
+                                    | NautilusWsMessage::OrderRejected(_)
+                                    | NautilusWsMessage::OrderCanceled(_)
+                                    | NautilusWsMessage::AccountState(_) => {
+                                        let _ = self.out_tx.send(nautilus_msg);
                                     }
                                     // Return messages that need client-side handling
                                     NautilusWsMessage::Reconnected

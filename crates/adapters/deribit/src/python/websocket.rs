@@ -258,6 +258,19 @@ impl DeribitWebSocketClient {
                                 call_python(py, &callback, py_obj);
                             }
                         }),
+                        // Execution events - handled by execution client
+                        NautilusWsMessage::OrderAccepted(event) => {
+                            tracing::debug!("Order accepted: {:?}", event);
+                        }
+                        NautilusWsMessage::OrderRejected(event) => {
+                            tracing::debug!("Order rejected: {:?}", event);
+                        }
+                        NautilusWsMessage::OrderCanceled(event) => {
+                            tracing::debug!("Order canceled: {:?}", event);
+                        }
+                        NautilusWsMessage::AccountState(state) => {
+                            tracing::debug!("Account state update: {:?}", state);
+                        }
                     }
                 }
             });

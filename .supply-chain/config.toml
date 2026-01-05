@@ -546,6 +546,10 @@ criteria = "safe-to-deploy"
 version = "0.6.9"
 criteria = "safe-to-deploy"
 
+[[exemptions.bytemuck]]
+version = "1.24.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.bytes]]
 version = "1.11.0"
 criteria = "safe-to-deploy"
@@ -2078,6 +2082,10 @@ criteria = "safe-to-deploy"
 version = "1.0.22"
 criteria = "safe-to-deploy"
 
+[[exemptions.safe_arch]]
+version = "1.0.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.same-file]]
 version = "1.0.6"
 criteria = "safe-to-deploy"
@@ -2648,6 +2656,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.whoami]]
 version = "1.6.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.wide]]
+version = "1.1.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.winapi]]

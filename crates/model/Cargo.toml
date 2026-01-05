@@ -53,12 +53,14 @@ indexmap = { workspace = true }
 log = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
 tabled = { workspace = true }
 thiserror = { workspace = true }
 ustr = { workspace = true }
+wide = { workspace = true }
 
 alloy-primitives = { workspace = true, optional = true }
 pyo3 = { workspace = true, optional = true }
@@ -73,6 +75,7 @@ rstest = { workspace = true }
 
 [build-dependencies]
 cbindgen = { workspace = true, optional = true }
+implied-vol = { workspace = true }
 
 [[bench]]
 name = "book_iai"
@@ -87,4 +90,14 @@ harness = false
 [[bench]]
 name = "fixed_precision_iai"
 path = "benches/fixed_precision_iai.rs"
+harness = false
+
+[[bench]]
+name = "greeks_criterion"
+path = "benches/greeks_criterion.rs"
+harness = false
+
+[[bench]]
+name = "black_scholes_simd_criterion"
+path = "benches/black_scholes_simd_criterion.rs"
 harness = false

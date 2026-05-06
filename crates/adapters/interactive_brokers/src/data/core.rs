@@ -387,15 +387,16 @@ impl InteractiveBrokersDataClient {
             get_runtime().spawn(async move {
                 while let Some(event) = receiver.recv().await {
                     Python::attach(|py| {
-                        let callback_guard = data_event_callback()
+                        let callback = data_event_callback()
                             .lock()
-                            .expect("data event callback mutex poisoned");
+                            .expect("data event callback mutex poisoned")
+                            .clone();
 
-                        let Some(callback) = callback_guard.as_ref() else {
+                        let Some(callback) = callback else {
                             return;
                         };
 
-                        if let Err(e) = dispatch_python_data_event(py, callback, event) {
+                        if let Err(e) = dispatch_python_data_event(py, &callback, event) {
                             tracing::error!("Failed to dispatch IB data event to Python: {e}");
                         }
                     });

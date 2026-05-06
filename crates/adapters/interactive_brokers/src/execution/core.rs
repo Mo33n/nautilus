@@ -422,15 +422,16 @@ impl InteractiveBrokersExecutionClient {
             get_runtime().spawn(async move {
                 while let Some(event) = receiver.recv().await {
                     Python::attach(|py| {
-                        let callback_guard = exec_event_callback()
+                        let callback = exec_event_callback()
                             .lock()
-                            .expect("execution event callback mutex poisoned");
+                            .expect("execution event callback mutex poisoned")
+                            .clone();
 
-                        let Some(callback) = callback_guard.as_ref() else {
+                        let Some(callback) = callback else {
                             return;
                         };
 
-                        if let Err(e) = dispatch_python_exec_event(py, callback, event) {
+                        if let Err(e) = dispatch_python_exec_event(py, &callback, event) {
                             tracing::error!("Failed to dispatch IB execution event to Python: {e}");
                         }
                     });

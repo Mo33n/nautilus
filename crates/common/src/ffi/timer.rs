@@ -158,14 +158,20 @@ impl Drop for TimeEventHandler_API {
         }
 
         let key = self.callback_ptr as usize;
-        let mut map = registry().lock().expect(MUTEX_POISONED);
-        if let Some(entry) = map.get_mut(&key) {
-            if entry.1 > 1 {
-                entry.1 -= 1;
-                return;
+        let mut arc_to_drop = None;
+        {
+            let mut map = registry().lock().expect(MUTEX_POISONED);
+            if let Some(entry) = map.get_mut(&key) {
+                if entry.1 > 1 {
+                    entry.1 -= 1;
+                    return;
+                }
+                // Final handler; remove from registry while locked, but drop outside lock.
+                arc_to_drop = map.remove(&key).map(|(arc, _)| arc);
             }
-            // This was the final handler – remove entry and drop Arc under GIL
-            let (arc, _) = map.remove(&key).unwrap();
+        }
+
+        if let Some(arc) = arc_to_drop {
             Python::attach(|_| drop(arc));
         }
     }

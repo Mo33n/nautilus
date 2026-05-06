@@ -21,4 +21,4 @@ RUN uv pip install --system jupyterlab datafusion
 
 ENV NAUTILUS_PATH="/"
 
-CMD ["python", "-m", "jupyterlab", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "-NotebookApp.token=''", "--NotebookApp.password=''", "tutorials"]
+CMD ["python", "-m", "jupyterlab", "--port=8888", "--no-browser", "--ip=127.0.0.1", "--allow-root", "tutorials"]

@@ -358,13 +358,7 @@ class DatabaseConfig(NautilusConfig, frozen=True):
     factor: int = 2
 
     def __repr__(self) -> str:
-        redacted_password = "None"
-
-        if self.password:
-            if len(self.password) >= 4:
-                redacted_password = f"{self.password[:2]}...{self.password[-2:]}"
-            else:
-                redacted_password = self.password
+        redacted_password = "***REDACTED***" if self.password else "None"
         return (
             f"{type(self).__name__}("
             f"type={self.type}, "

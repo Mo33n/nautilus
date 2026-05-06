@@ -488,9 +488,14 @@ def create_inferred_order_filled_event(
         elif report.price is not None:
             # If no avg_px but we have a price (e.g., from LIMIT order), use that
             last_px = report.price
+        elif order.price is not None:
+            # Fall back to order price for priced order types (e.g. LIMIT).
+            last_px = order.price
         else:
-            # Retain original fallback for now
-            last_px = instrument.make_price(0.0)
+            raise ValueError(
+                f"Unable to infer fill price for {order.client_order_id}: "
+                "report has no avg_px/price and order has no price",
+            )
     else:
         report_cost: float = float(report.avg_px or 0.0) * float(report.filled_qty)
         filled_cost = float(order.avg_px) * float(order.filled_qty)

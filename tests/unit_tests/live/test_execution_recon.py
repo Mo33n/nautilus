@@ -6051,3 +6051,56 @@ class TestInferredFillCommission:
 
         assert first.trade_id == second.trade_id
         assert first.id != second.id
+
+    def test_missing_report_prices_falls_back_to_order_price(self):
+        from nautilus_trader.live.reconciliation import create_inferred_order_filled_event
+
+        instrument = AUDUSD_SIM
+        order, report = self._make_order_and_report(instrument)
+        report.avg_px = None
+        report.price = None
+
+        filled = create_inferred_order_filled_event(
+            order=order,
+            ts_now=0,
+            report=report,
+            instrument=instrument,
+            client=None,
+        )
+
+        assert filled.last_px == order.price
+
+    def test_missing_report_and_order_price_raises(self):
+        from nautilus_trader.live.reconciliation import create_inferred_order_filled_event
+
+        instrument = AUDUSD_SIM
+        order = TestExecStubs.market_order(instrument=instrument)
+        accepted = TestEventStubs.order_accepted(order)
+        order.apply(accepted)
+        report = OrderStatusReport(
+            instrument_id=instrument.id,
+            account_id=TestIdStubs.account_id(),
+            client_order_id=order.client_order_id,
+            venue_order_id=VenueOrderId("V-2"),
+            order_side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            time_in_force=TimeInForce.GTC,
+            order_status=OrderStatus.FILLED,
+            quantity=Quantity.from_int(100_000),
+            filled_qty=Quantity.from_int(100_000),
+            report_id=UUID4(),
+            ts_accepted=0,
+            ts_last=0,
+            ts_init=0,
+        )
+        report.avg_px = None
+        report.price = None
+
+        with pytest.raises(ValueError, match="Unable to infer fill price"):
+            create_inferred_order_filled_event(
+                order=order,
+                ts_now=0,
+                report=report,
+                instrument=instrument,
+                client=None,
+            )

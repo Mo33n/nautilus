@@ -51,6 +51,7 @@ from nautilus_trader.model.instruments import CurrencyPair
 from nautilus_trader.model.objects import Price
 from nautilus_trader.model.objects import Quantity
 from nautilus_trader.persistence.catalog.parquet import ParquetDataCatalog
+from nautilus_trader.persistence.catalog.parquet import _sanitize_instance_id
 from nautilus_trader.persistence.funcs import class_to_filename
 from nautilus_trader.persistence.wranglers_v2 import QuoteTickDataWranglerV2
 from nautilus_trader.persistence.wranglers_v2 import TradeTickDataWranglerV2
@@ -105,6 +106,19 @@ def test_catalog_query_custom_filtered(
         where=f"action = '{BookAction.DELETE.value}'",
     )
     assert len(filtered_deltas) == 351
+
+
+def test_catalog_query_where_rejects_forbidden_sql_tokens(
+    catalog_betfair: ParquetDataCatalog,
+) -> None:
+    with pytest.raises(ValueError, match="forbidden SQL tokens"):
+        catalog_betfair.order_book_deltas(
+            where="action = 'D' OR 1=1; DROP TABLE trades",
+        )
+
+
+def test_sanitize_instance_id_removes_traversal_sequences() -> None:
+    assert _sanitize_instance_id("../foo/..\\bar") == "foobar"
 
 
 def test_catalog_instruments_df(

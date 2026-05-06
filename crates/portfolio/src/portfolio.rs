@@ -1935,7 +1935,7 @@ fn update_order(
     cache: &Rc<RefCell<Cache>>,
     clock: &Rc<RefCell<dyn Clock>>,
     inner: &Rc<RefCell<PortfolioState>>,
-    _config: PortfolioConfig,
+    config: PortfolioConfig,
     event: &OrderEventAny,
 ) {
     let account_id = match event.account_id() {
@@ -2031,7 +2031,7 @@ fn update_order(
             clock: clock.clone(),
             cache: cache.clone(),
             inner: inner.clone(),
-            config: PortfolioConfig::default(), // TODO: TBD
+            config: config.clone(),
         };
 
         match portfolio_clone.calculate_unrealized_pnl(&order_filled.instrument_id, None) {
@@ -2075,7 +2075,7 @@ fn update_position(
     cache: &Rc<RefCell<Cache>>,
     clock: &Rc<RefCell<dyn Clock>>,
     inner: &Rc<RefCell<PortfolioState>>,
-    _config: PortfolioConfig,
+    config: PortfolioConfig,
     event: &PositionEvent,
 ) {
     let instrument_id = event.instrument_id();
@@ -2096,7 +2096,7 @@ fn update_position(
         clock: clock.clone(),
         cache: cache.clone(),
         inner: inner.clone(),
-        config: PortfolioConfig::default(), // TODO: TBD
+        config,
     };
 
     portfolio_clone.update_net_position(&instrument_id, &positions_open);

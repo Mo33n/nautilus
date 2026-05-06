@@ -55,7 +55,7 @@ def test_repr_with_redacted_password() -> None:
     # Act, Assert
     assert (
         repr(config)
-        == "DatabaseConfig(type=redis, host=None, port=None, username=username, password=pa...rd, "
+        == "DatabaseConfig(type=redis, host=None, port=None, username=username, password=***REDACTED***, "
         "ssl=False, connection_timeout=20, response_timeout=20, number_of_retries=100, "
         "exponent_base=2, max_delay=1000, factor=2)"
     )

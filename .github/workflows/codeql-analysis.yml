@@ -24,7 +24,9 @@ jobs:
       # https://github.com/step-security/harden-runner
       - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
         with:
-          egress-policy: ${{ vars.STEP_SECURITY_EGRESS_POLICY || 'block' }}
+          # In forks, org-level endpoint allowlists are usually absent.
+          # Fall back to audit mode so checkout can still reach github.com.
+          egress-policy: ${{ github.repository_owner == 'nautechsystems' && (vars.STEP_SECURITY_EGRESS_POLICY || 'block') || 'audit' }}
           allowed-endpoints: >-
             ${{ vars.COMMON_ALLOWED_ENDPOINTS }}
             ${{ vars.CI_ALLOWED_ENDPOINTS }}

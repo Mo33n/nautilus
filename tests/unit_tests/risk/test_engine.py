@@ -3298,6 +3298,44 @@ class TestRiskEngineWithCashAccount:
         # Assert
         assert order.status == OrderStatus.DENIED
 
+    def test_submit_order_when_account_missing_for_venue_then_denies(self):
+        # Arrange
+        self.exec_engine.start()
+        self.cache.add_instrument(_XBTUSD_BITMEX)
+
+        strategy = Strategy()
+        strategy.register(
+            trader_id=self.trader_id,
+            portfolio=self.portfolio,
+            msgbus=self.msgbus,
+            cache=self.cache,
+            clock=self.clock,
+        )
+
+        quote = TestDataStubs.quote_tick(instrument=_XBTUSD_BITMEX)
+        self.cache.add_quote_tick(quote)
+
+        order = strategy.order_factory.market(
+            _XBTUSD_BITMEX.id,
+            OrderSide.BUY,
+            Quantity.from_int(1),
+        )
+        submit_order = SubmitOrder(
+            trader_id=order.trader_id,
+            strategy_id=order.strategy_id,
+            position_id=None,
+            order=order,
+            command_id=UUID4(),
+            ts_init=self.clock.timestamp_ns(),
+        )
+
+        # Act
+        self.risk_engine.execute(submit_order)
+
+        # Assert
+        assert order.status == OrderStatus.DENIED
+        assert self.exec_engine.command_count == 0
+
 
 class TestRiskEngineWithBettingAccount:
     def setup(self):

@@ -673,10 +673,15 @@ cdef class RiskEngine(Component):
                 f"Cannot find account for venue {instrument.id.venue} "
                 f"(account_id={account_id.get_issuer() if account_id is not None else None})"
             )
-            return True  # TODO: Temporary early return until handling routing/multiple venues
-
-        if account.is_margin_account:
-            return True  # TODO: Determine risk controls for margin
+            for order in orders:
+                self._deny_order(
+                    order=order,
+                    reason=(
+                        f"NO_ACCOUNT_FOR_VENUE: venue={instrument.id.venue}, "
+                        f"account_id={account_id.get_issuer() if account_id is not None else None}"
+                    ),
+                )
+            return False  # Denied
 
         cdef bint allow_borrowing = isinstance(account, CashAccount) and account.allow_borrowing
 

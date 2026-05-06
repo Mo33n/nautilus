@@ -2019,7 +2019,7 @@ class ParquetDataCatalog(BaseDataCatalog):
     ) -> str:
         # Build datafusion SQL query
         query = f"SELECT * FROM {table}"  # noqa: S608
-        conditions: list[str] = [] + ([where] if where else [])
+        conditions: list[str] = [] + ([_validate_where_clause(where)] if where else [])
 
         if start:
             start_ts = dt_to_unix_nanos(start)
@@ -2824,7 +2824,8 @@ class ParquetDataCatalog(BaseDataCatalog):
         """
         List feather files for a specific data class.
         """
-        base_dir = f"{self.path.rstrip('/')}/{kind}/{instance_id}"
+        safe_instance_id = _sanitize_instance_id(instance_id)
+        base_dir = f"{self.path.rstrip('/')}/{kind}/{safe_instance_id}"
         data_name = class_to_filename(data_cls)
         data_dir = f"{base_dir}/{data_name}"
 
@@ -2980,3 +2981,34 @@ def _sanitize_sql_identifier(identifier: str) -> str:
         .replace(":", "_")
         .lower()
     )
+
+
+def _sanitize_instance_id(instance_id: str) -> str:
+    """
+    Sanitize run instance IDs before filesystem path interpolation.
+    """
+    safe = urisafe_identifier(instance_id)
+    if ".." in safe:
+        safe = safe.replace("..", "")
+    safe = safe.replace("\\", "")
+    return safe
+
+
+def _validate_where_clause(where: str) -> str:
+    """
+    Validate user-supplied SQL predicate fragments to reduce injection risk.
+    """
+    where_clean = where.strip()
+    if not where_clean:
+        raise ValueError("`where` cannot be empty")
+
+    lowered = where_clean.lower()
+    forbidden_tokens = (";", "--", "/*", "*/", " union ", " select ", " insert ", " delete ")
+    if any(token in lowered for token in forbidden_tokens):
+        raise ValueError("`where` contains forbidden SQL tokens")
+
+    safe_pattern = r'^[\w\s\(\)\.\'":<>=!&|+-]+$'
+    if not re.match(safe_pattern, where_clean):
+        raise ValueError("`where` contains unsupported characters")
+
+    return where_clean

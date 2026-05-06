@@ -3606,8 +3606,9 @@ async def test_query_position_status_reports_success(live_exec_engine, exec_clie
 
     # Assert
     assert len(venue_positions) == 1
-    assert AUDUSD_SIM.id in venue_positions
-    assert venue_positions[AUDUSD_SIM.id].quantity == Quantity.from_int(1000)
+    key = (AUDUSD_SIM.id, account_id)
+    assert key in venue_positions
+    assert venue_positions[key].quantity == Quantity.from_int(1000)
     assert failed_venues == set()
 
 
@@ -3672,9 +3673,81 @@ async def test_query_position_status_reports_multiple_instruments(
 
     # Assert
     assert len(venue_positions) == 2
-    assert AUDUSD_SIM.id in venue_positions
-    assert GBPUSD_SIM.id in venue_positions
+    assert (AUDUSD_SIM.id, account_id) in venue_positions
+    assert (GBPUSD_SIM.id, account_id) in venue_positions
     assert failed_venues == set()
+
+
+@pytest.mark.asyncio
+async def test_query_position_status_reports_same_instrument_different_accounts(
+    live_exec_engine,
+    exec_client,
+    account_id,
+):
+    """
+    Test _query_position_status_reports preserves account granularity per instrument.
+    """
+    live_exec_engine.register_client(exec_client)
+    second_account_id = AccountId("SIM-002")
+
+    report_1 = PositionStatusReport(
+        account_id=account_id,
+        instrument_id=AUDUSD_SIM.id,
+        position_side=PositionSide.LONG,
+        quantity=Quantity.from_int(1000),
+        report_id=UUID4(),
+        ts_last=live_exec_engine._clock.timestamp_ns(),
+        ts_init=live_exec_engine._clock.timestamp_ns(),
+    )
+    report_2 = PositionStatusReport(
+        account_id=second_account_id,
+        instrument_id=AUDUSD_SIM.id,
+        position_side=PositionSide.SHORT,
+        quantity=Quantity.from_int(500),
+        report_id=UUID4(),
+        ts_last=live_exec_engine._clock.timestamp_ns(),
+        ts_init=live_exec_engine._clock.timestamp_ns(),
+    )
+    exec_client.add_position_status_report(report_1)
+    exec_client.add_position_status_report(report_2)
+
+    venue_positions, failed_venues = await live_exec_engine._query_position_status_reports()
+
+    assert len(venue_positions) == 2
+    assert (AUDUSD_SIM.id, account_id) in venue_positions
+    assert (AUDUSD_SIM.id, second_account_id) in venue_positions
+    assert failed_venues == set()
+
+
+def test_reconcile_position_report_netting_scopes_positions_to_report_account(
+    live_exec_engine,
+    account_id,
+    monkeypatch,
+):
+    """
+    Test netting reconciliation requests positions for the report account only.
+    """
+    report = PositionStatusReport(
+        account_id=account_id,
+        instrument_id=AUDUSD_SIM.id,
+        position_side=PositionSide.FLAT,
+        quantity=Quantity.from_int(0),
+        report_id=UUID4(),
+        ts_last=live_exec_engine._clock.timestamp_ns(),
+        ts_init=live_exec_engine._clock.timestamp_ns(),
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_positions_open(**kwargs):
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(live_exec_engine._cache, "positions_open", fake_positions_open)
+
+    live_exec_engine._reconcile_position_report_netting(report)
+
+    assert captured.get("account_id") == account_id
 
 
 # Tests for _query_and_find_missing_fills
